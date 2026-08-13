@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DEHGS PLANNER - chandy-and-the-dehgs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet CSS & JS for Interactive Map View -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    input, select, textarea {
+      font-size: 16px !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    @media (min-width: 640px) {
+      input, select, textarea {
+        font-size: 14px !important;
+      }
+    }
+    input[type="date"], input[type="time"] {
+      min-height: 42px;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+    #map-container {
+      height: 450px;
+      width: 100%;
+      border-radius: 1rem;
+      z-index: 10;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 1rem !important;
+      padding: 4px !important;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1) !important;
+    }
+
+    /* Print Styles for PDF Export */
+    @media print {
+      body { background: white !important; color: black !important; }
+      #app-wrapper, #auth-overlay, .leaflet-control-container, .no-print { display: none !important; }
+      #print-area { display: block !important; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+      th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+      th { background-color: #f1f5f9 !important; font-weight: bold; }
+      .badge { background: #e0e7ff; color: #3730a3; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    }
+  </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen font-sans">
+
+  <!-- Password Overlay -->
+  <div id="auth-overlay" class="fixed inset-0 bg-[#0b0f19] z-[100] flex items-center justify-center p-4 transition-opacity duration-300">
+    <div class="bg-[#131927] border border-slate-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6">
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center text-white mx-auto shadow-lg shadow-indigo-500/30">
+        <i class="fa-solid fa-lock text-2xl"></i>
+      </div>
+      <div>
+        <h2 class="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Access Required</h2>
+        <p class="text-sm text-slate-400 mt-2">Enter the squad password to view the planner.</p>
+      </div>
+      <div class="space-y-4">
+        <input type="password" id="app-password" onkeydown="if(event.key==='Enter') window.checkPassword()" placeholder="Password" class="w-full bg-[#0b0f19] border border-slate-700/80 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-lg tracking-widest transition-all">
+        <button onclick="checkPassword()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all active:scale-95 shadow-md shadow-indigo-600/20">
+          Unlock Planner
+        </button>
+      </div>
+      <p id="auth-error" class="text-xs font-bold text-rose-500 hidden animate-bounce">Incorrect password. Try again.</p>
+    </div>
+  </div>
+
+  <!-- Print Area for PDF Export -->
+  <div id="print-area" class="hidden p-8 bg-white text-slate-900">
+    <div class="max-w-3xl mx-auto space-y-6">
+      <div class="border-b pb-4 flex justify-between items-end">
+        <div>
+          <h1 class="text-2xl font-black uppercase tracking-tight">CHANDY AND THE DEHGS TRIP</h1>
+          <p class="text-xs text-slate-500 mt-1">Complete Itinerary Report • <span id="print-date"></span></p>
+        </div>
+        <span class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-lg">DEHGS PLANNER</span>
+      </div>
+      <div id="print-content-body"></div>
+    </div>
+  </div>
+
+  <!-- Main App Wrapper -->
+  <div id="app-wrapper" class="hidden flex-col min-h-screen">
+    <!-- Top Navigation Header -->
+    <header class="bg-[#0b0f19] border-b border-slate-800/80 px-4 py-3 sticky top-0 z-40">
+      <div class="max-w-5xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+            <i class="fa-solid fa-compass text-xl"></i>
+          </div>
+          <div>
+            <h1 class="text-xs sm:text-sm font-extrabold tracking-wider text-white uppercase">DEHGS PLANNER</h1>
+            <p class="text-[11px] sm:text-xs text-indigo-400 font-medium">Code: <span id="trip-code" class="font-bold">DEHGS</span></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Export Dropdown -->
+          <div class="relative export-dropdown-container">
+            <button onclick="toggleExportMenu()" class="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700/60 transition-all flex items-center gap-1.5 active:scale-95">
+              <i class="fa-solid fa-share-from-square"></i>
+              <span class="hidden sm:inline">Export</span>
+            </button>
+            <div id="export-menu" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 hidden z-50 text-slate-700 overflow-hidden transform origin-top-right transition-all">
+              <button onclick="exportToSheets()" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2.5 text-xs font-bold border-b border-slate-100">
+                <i class="fa-solid fa-file-csv text-emerald-600 text-sm w-4"></i> Sheets (CSV)
+              </button>
+              <button onclick="exportToPDF()" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2.5 text-xs font-bold">
+                <i class="fa-solid fa-file-pdf text-rose-500 text-sm w-4"></i> Export PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Add Dropdown -->
+          <div class="relative add-dropdown-container">
+            <button onclick="toggleAddMenu()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 active:scale-95">
+              <i class="fa-solid fa-plus text-xs"></i>
+              <span>Add</span>
+            </button>
+            <div id="add-menu" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 hidden z-50 text-slate-700 overflow-hidden transform origin-top-right transition-all">
+              <button onclick="openModalForCreate(); toggleAddMenu()" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2.5 text-xs font-bold border-b border-slate-100">
+                <i class="fa-solid fa-pen text-slate-400 text-sm w-4"></i> Manual Entry
+              </button>
+              <button onclick="openAIModal(); toggleAddMenu()" class="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-center gap-2.5 text-xs font-bold text-indigo-600">
+                <i class="fa-solid fa-wand-magic-sparkles text-sm w-4"></i> AI Smart Import
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dark Banner Area -->
+    <section class="bg-[#0b0f19] pt-6 pb-8 px-4 border-b border-slate-800/50">
+      <div class="max-w-5xl mx-auto space-y-5">
+        
+        <div>
+          <div class="flex items-center gap-1.5 text-xs font-bold tracking-wider text-indigo-400 uppercase mb-1">
+            <i class="fa-solid fa-cloud text-indigo-400"></i>
+            <span>Live Shared Itinerary</span>
+            <span id="sync-status" class="ml-2 px-2.5 py-0.5 rounded-full text-[10px] bg-slate-500/20 text-slate-400 border border-slate-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Connecting to Firestore...
+            </span>
+          </div>
+          <h2 class="text-2xl sm:text-4xl font-black text-white uppercase tracking-tight">
+            CHANDY AND THE DEHGS TRIP
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            Collaborate on flights, hotel bookings, activities, and rides in real-time. Changes sync automatically across shared devices.
+          </p>
+        </div>
+
+        <div class="bg-[#131927] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 max-w-xl shadow-lg">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-400">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-users text-indigo-400"></i>
+              <span class="text-slate-200 font-bold uppercase tracking-wider text-[11px]">Trip Dehgs (<span id="dehgs-count">0</span>)</span>
+            </div>
+          </div>
+
+          <div id="dehgs-members-container" class="flex flex-wrap gap-2 min-h-[32px] items-center">
+            <span class="text-xs text-slate-500 italic">Waiting for cloud sync...</span>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1">
+            <div class="relative flex-1">
+              <span class="absolute left-3.5 top-2.5 sm:top-3 text-slate-400 text-sm font-bold">+</span>
+              <input type="text" id="new-friend-input" placeholder="Friend name" class="w-full bg-[#0b0f19] border border-slate-700/80 rounded-xl pl-8 pr-3 py-2.5 sm:py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+            </div>
+            <button onclick="addDehgMember()" class="px-5 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-md shadow-indigo-600/20">
+              Add
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Light Content Area -->
+    <main class="bg-white text-slate-800 flex-1 px-4 py-6">
+      <div class="max-w-5xl mx-auto space-y-6">
+
+        <!-- View Selector Tabs -->
+        <div class="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto custom-scrollbar border border-slate-200/80 text-xs font-semibold">
+          <button onclick="switchView('table')" id="view-btn-table" class="view-btn flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-indigo-600 shadow-sm transition-all whitespace-nowrap font-bold">
+            <i class="fa-solid fa-list-ul"></i>
+            <span>Table View</span>
+          </button>
+          <button onclick="switchView('timeline')" id="view-btn-timeline" class="view-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 transition-all whitespace-nowrap">
+            <i class="fa-regular fa-clock"></i>
+            <span>Day Timeline</span>
+          </button>
+          <button onclick="switchView('map')" id="view-btn-map" class="view-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 transition-all whitespace-nowrap">
+            <i class="fa-solid fa-map-location-dot"></i>
+            <span>Map View</span>
+          </button>
+          <button onclick="switchView('byperson')" id="view-btn-byperson" class="view-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 transition-all whitespace-nowrap">
+            <i class="fa-regular fa-user"></i>
+            <span>By Dehg</span>
+          </button>
+        </div>
+
+        <!-- Filters Bar -->
+        <div id="filters-bar" class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          <span class="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] text-slate-400">
+            <i class="fa-solid fa-filter text-[10px]"></i> Filters:
+          </span>
+          <select id="filter-category" onchange="renderCurrentView()" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none focus:border-indigo-500 shadow-sm">
+            <option value="ALL">All Categories</option>
+            <option value="Flight">Flights</option>
+            <option value="Hotel">Hotels</option>
+            <option value="Activity">Activities</option>
+            <option value="Ride">Rides & Transport</option>
+            <option value="Food">Food & Drinks</option>
+          </select>
+          <select id="filter-friend" onchange="renderCurrentView()" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-medium text-slate-700 outline-none focus:border-indigo-500 shadow-sm">
+            <option value="ALL">All Dehgs</option>
+          </select>
+        </div>
+
+        <!-- Main Display Container -->
+        <div id="view-container" class="min-h-[250px]">
+          <div class="flex flex-col items-center justify-center p-12 text-slate-400 gap-2">
+            <i class="fa-solid fa-circle-notch animate-spin text-2xl text-indigo-500"></i>
+            <span class="text-xs font-semibold">Connecting to cloud database...</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Manual Item Modal -->
+  <div id="add-item-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden items-start justify-center p-3 sm:p-6 z-[60] overflow-y-auto pt-4 sm:pt-8">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl border border-slate-100 text-slate-800 my-auto mb-12 sm:mb-auto relative">
+      
+      <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+        <h3 id="modal-title-text" class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-calendar-plus text-indigo-600"></i> Add Itinerary Item
+        </h3>
+        <button onclick="closeModal('add-item-modal')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <input type="hidden" id="editing-item-id" value="">
+      <input type="hidden" id="item-lat" value="">
+      <input type="hidden" id="item-lng" value="">
+
+      <div class="space-y-4 w-full overflow-hidden">
+        <div>
+          <label class="block font-bold text-slate-600 uppercase mb-1 text-[11px] tracking-wider">Item Title</label>
+          <input type="text" id="item-title" placeholder="e.g. Flight to LAX or Hotel Check-in" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-600 uppercase mb-1.5 text-[11px] tracking-wider">Category</label>
+          <div class="flex flex-wrap gap-2" id="category-pills">
+            <button type="button" onclick="selectCategory('Flight')" data-cat="Flight" class="cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-indigo-600 text-white border-indigo-600 shadow-sm">
+              <i class="fa-solid fa-plane"></i> Flight
+            </button>
+            <button type="button" onclick="selectCategory('Hotel')" data-cat="Hotel" class="cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100">
+              <i class="fa-solid fa-hotel"></i> Hotel
+            </button>
+            <button type="button" onclick="selectCategory('Activity')" data-cat="Activity" class="cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100">
+              <i class="fa-solid fa-ticket"></i> Activity
+            </button>
+            <button type="button" onclick="selectCategory('Ride')" data-cat="Ride" class="cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100">
+              <i class="fa-solid fa-car"></i> Ride
+            </button>
+            <button type="button" onclick="selectCategory('Food')" data-cat="Food" class="cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100">
+              <i class="fa-solid fa-utensils"></i> Food
+            </button>
+          </div>
+        </div>
+
+        <div class="relative">
+          <label class="block font-bold text-slate-600 uppercase mb-1 text-[11px] tracking-wider">Location / Venue</label>
+          <div class="relative w-full">
+            <span class="absolute left-3.5 top-3 text-indigo-500 text-xs"><i class="fa-solid fa-location-dot"></i></span>
+            <input type="text" id="item-location" oninput="handleLiveLocationSearch(this.value)" autocomplete="off" placeholder="Search any hotel, airport, city, address..." class="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+            <button type="button" onclick="clearLocationInput()" class="absolute right-3 top-2.5 text-slate-300 hover:text-slate-500"><i class="fa-solid fa-circle-xmark text-xs"></i></button>
+          </div>
+          <div id="location-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 hidden overflow-hidden max-h-56 overflow-y-auto custom-scrollbar"></div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-600 uppercase mb-1 text-[11px] tracking-wider">Assign To</label>
+          <select id="item-person" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white transition-all"></select>
+        </div>
+
+        <div class="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5 w-full">
+          <span class="block font-extrabold text-indigo-600 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-play text-[9px]"></i> Start Event
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
+            <div class="w-full min-w-0">
+              <label class="block font-bold text-slate-500 uppercase mb-1 text-[10px] tracking-wider">Start Date</label>
+              <input type="date" id="item-date" onchange="syncEndDateDefault()" value="2026-10-01" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white text-slate-800 transition-all">
+            </div>
+            <div class="w-full min-w-0">
+              <label class="block font-bold text-slate-500 uppercase mb-1 text-[10px] tracking-wider">Start Time</label>
+              <input type="time" id="item-time" onchange="syncEndTimeDefault()" value="12:00" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white text-slate-800 transition-all">
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5 w-full">
+          <span class="block font-extrabold text-slate-500 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-flag-checkered text-[9px]"></i> End Event
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
+            <div class="w-full min-w-0">
+              <label class="block font-bold text-slate-500 uppercase mb-1 text-[10px] tracking-wider">End Date</label>
+              <input type="date" id="item-end-date" value="2026-10-01" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white text-slate-800 transition-all">
+            </div>
+            <div class="w-full min-w-0">
+              <label class="block font-bold text-slate-500 uppercase mb-1 text-[10px] tracking-wider">End Time</label>
+              <input type="time" id="item-end-time" value="12:00" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-white text-slate-800 transition-all">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-600 uppercase mb-1 text-[11px] tracking-wider">Notes / Confirmation #</label>
+          <textarea id="item-notes" rows="2" placeholder="Confirmation numbers, gate info, address..." class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2.5 mt-5 pt-3 border-t border-slate-100">
+        <button onclick="closeModal('add-item-modal')" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-xl font-semibold text-xs active:scale-95">Cancel</button>
+        <button onclick="saveItem()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-500/20 active:scale-95">Save Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Smart Import Modal -->
+  <div id="ai-import-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden items-start justify-center p-3 sm:p-6 z-[60] overflow-y-auto pt-4 sm:pt-8">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl border border-slate-100 text-slate-800 my-auto mb-12 sm:mb-auto relative">
+      <div class="flex justify-between items-start mb-4 border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-indigo-600 flex items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> AI Smart Import
+          </h3>
+          <p class="text-[11px] text-slate-500 mt-1 leading-snug">Paste notes or upload a screenshot of your booking confirmation. Gemini AI will automatically extract and add the itinerary details.</p>
+        </div>
+        <button onclick="closeModal('ai-import-modal')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center shrink-0 ml-3">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block font-bold text-slate-600 uppercase mb-1 text-[11px] tracking-wider">Paste Text or Notes</label>
+          <textarea id="ai-prompt-input" rows="4" placeholder="e.g. Dinner with Chandy at Roy's Waikiki on October 3 at 7:30 PM..." class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs sm:text-sm"></textarea>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-600 uppercase mb-1 text-[11px] tracking-wider">Or Upload Confirmation Screenshot</label>
+          <div class="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-indigo-500 transition-colors bg-slate-50/50">
+            <input type="file" id="ai-image-input" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+          </div>
+        </div>
+
+        <div id="ai-status-message"></div>
+
+        <div class="flex justify-end gap-2.5 mt-5 pt-3 border-t border-slate-100">
+          <button onclick="closeModal('ai-import-modal')" class="px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-xl font-semibold text-xs active:scale-95">Cancel</button>
+          <button id="ai-submit-btn" onclick="processAIInput()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/30 active:scale-95 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-sparkles"></i> Extract & Add
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pure Cloud Firebase Synchronization Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyArzpRf0LdvxaaxgAvEbrSDmBXMVysvE78",
+      authDomain: "trip-planner-3de22.firebaseapp.com",
+      projectId: "trip-planner-3de22",
+      storageBucket: "trip-planner-3de22.firebasestorage.app",
+      messagingSenderId: "452337848166",
+      appId: "1:452337848166:web:6a1c6d72745e973161c2a7",
+      measurementId: "G-KEE4Q8G02G"
+    };
+    
+    const appId = 'chandy-and-the-dehgs-global-room';
+
+    let db = null;
+    let auth = null;
+    let user = null;
+
+    window.state = {
+      dehgs: [],
+      items: [],
+      selectedCategory: 'Flight',
+      currentView: 'table'
+    };
+
+    async function initFirebase() {
+      const syncStatusEl = document.getElementById('sync-status');
+      const containerEl = document.getElementById('view-container');
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        // Authenticate (Custom token -> Anonymous fallback)
+        let authenticated = false;
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          try {
+            await signInWithCustomToken(auth, __initial_auth_token);
+            authenticated = true;
+          } catch(e) {
+            console.warn("Custom token auth attempt bypassed:", e.message);
+          }
+        }
+
+        if (!authenticated) {
+          try {
+            await signInAnonymously(auth);
+            authenticated = true;
+          } catch(anonErr) {
+            console.error("Anonymous authentication error:", anonErr.message);
+            if (syncStatusEl) syncStatusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Auth Error (Enable Anon Auth in Firebase)';
+            if (containerEl) {
+              containerEl.innerHTML = `
+                <div class="border-2 border-dashed border-rose-200 bg-rose-50 rounded-3xl p-8 sm:p-12 text-center my-4">
+                  <i class="fa-solid fa-triangle-exclamation text-rose-500 text-3xl mb-3"></i>
+                  <h3 class="text-base font-bold text-slate-800">Authentication Required in Firebase Console</h3>
+                  <p class="text-xs text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
+                    To enable live real-time sync across devices on your project <strong class="text-slate-800">trip-planner-3de22</strong>, please log into <a href="https://console.firebase.google.com/" target="_blank" class="underline font-bold text-indigo-600">Firebase Console</a>, navigate to <strong>Build ➔ Authentication ➔ Sign-in Method</strong>, and enable <strong>Anonymous</strong> sign-in provider.
+                  </p>
+                </div>
+              `;
+            }
+            return;
+          }
+        }
+
+        onAuthStateChanged(auth, (currentUser) => {
+          user = currentUser;
+          if (user) {
+            if (syncStatusEl) syncStatusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Connected';
+            setupFirestoreListeners();
+          }
+        });
+      } catch (err) {
+        console.error("Firebase connection error:", err);
+        if (syncStatusEl) syncStatusEl.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Connection Error';
+      }
+    }
+
+    function setupFirestoreListeners() {
+      if (!db || !user) return;
+
+      const membersRef = collection(db, 'artifacts', appId, 'public', 'data', 'dehgs_members');
+      onSnapshot(membersRef, (snapshot) => {
+        window.state.dehgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        window.renderDehgs();
+        if (window.state.currentView !== 'map') window.renderCurrentView(); 
+      }, (err) => {
+        console.error("Firestore sync error (dehgs):", err.message);
+        document.getElementById('sync-status').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Permission Error';
+      });
+
+      const itemsRef = collection(db, 'artifacts', appId, 'public', 'data', 'itinerary_items');
+      onSnapshot(itemsRef, (snapshot) => {
+        window.state.items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        window.renderCurrentView();
+      }, (err) => {
+        console.error("Firestore sync error (items):", err.message);
+        document.getElementById('sync-status').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Permission Error';
+      });
+    }
+
+    window.addDehgMember = async function() {
+      const input = document.getElementById('new-friend-input');
+      const name = input.value.trim();
+      if (!name || !user || !db) return;
+
+      try {
+        const membersRef = collection(db, 'artifacts', appId, 'public', 'data', 'dehgs_members');
+        await addDoc(membersRef, { name, createdAt: Date.now() });
+        input.value = '';
+      } catch (e) {
+        console.error("Cloud save failed:", e.message);
+      }
+    };
+
+    window.removeDehgMember = async function(id) {
+      if (!user || !db) return;
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'dehgs_members', id);
+        await deleteDoc(docRef);
+      } catch (e) {
+        console.error("Cloud delete failed:", e.message);
+      }
+    };
+
+    window.saveItem = async function(customData = null) {
+      if (!user || !db) return;
+
+      const editingId = customData ? customData.editingId : document.getElementById('editing-item-id').value;
+      const title = customData ? customData.title : document.getElementById('item-title').value.trim();
+      const category = customData ? (customData.category || 'Activity') : (window.state.selectedCategory || 'Flight');
+      const location = customData ? (customData.location || '') : document.getElementById('item-location').value.trim();
+      const latVal = customData ? customData.lat : document.getElementById('item-lat').value;
+      const lngVal = customData ? customData.lng : document.getElementById('item-lng').value;
+      const person = customData ? (customData.person || 'Everyone') : (document.getElementById('item-person').value || 'Everyone');
+      const rawStartDate = customData ? (customData.rawStartDate || '2026-10-01') : (document.getElementById('item-date').value || '2026-10-01');
+      const rawStartTime = customData ? (customData.rawStartTime || '12:00') : (document.getElementById('item-time').value || '12:00');
+      const rawEndDate = customData ? (customData.rawEndDate || rawStartDate) : (document.getElementById('item-end-date').value || rawStartDate);
+      const rawEndTime = customData ? (customData.rawEndTime || rawStartTime) : (document.getElementById('item-end-time').value || rawStartTime);
+      const notes = customData ? (customData.notes || '') : document.getElementById('item-notes').value.trim();
+
+      if (!title) return;
+
+      const dateDisplay = window.buildDateTimeDisplay(rawStartDate, rawStartTime, rawEndDate, rawEndTime);
+      let lat = latVal ? parseFloat(latVal) : null;
+      let lng = lngVal ? parseFloat(lngVal) : null;
+
+      const itemData = { 
+        title, category, location, lat, lng, person, 
+        rawStartDate, rawStartTime, rawEndDate, rawEndTime, 
+        dateDisplay, date: dateDisplay, notes, updatedAt: Date.now()
+      };
+
+      try {
+        if (editingId) {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'itinerary_items', editingId);
+          await updateDoc(docRef, itemData);
+        } else {
+          const itemsRef = collection(db, 'artifacts', appId, 'public', 'data', 'itinerary_items');
+          await addDoc(itemsRef, { ...itemData, createdAt: Date.now() });
+        }
+        if(!customData) {
+          window.closeModal('add-item-modal');
+          window.resetForm();
+        }
+      } catch (e) {
+        console.error("Cloud save failed:", e.message);
+      }
+    };
+
+    window.deleteItem = async function(id) {
+      if (!user || !db) return;
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'itinerary_items', id);
+        await deleteDoc(docRef);
+      } catch (e) {
+        console.error("Cloud delete failed:", e.message);
+      }
+    };
+
+    window.initFirebase = initFirebase;
+  </script>
+
+  <!-- Global UI, Exports, Map, AI Parsing, Auth Logic -->
+  <script>
+    let leafletMap = null;
+    let searchDebounceTimer = null;
+
+    // --- Authentication (Password = christina) ---
+    function checkPassword() {
+      const pwd = document.getElementById('app-password').value;
+      if (pwd.toLowerCase() === 'christina') {
+        sessionStorage.setItem('dehgs_auth', 'true');
+        document.getElementById('auth-overlay').classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => {
+          document.getElementById('auth-overlay').classList.add('hidden');
+          document.getElementById('app-wrapper').classList.remove('hidden');
+          if(window.initFirebase) window.initFirebase();
+        }, 300);
+      } else {
+        const err = document.getElementById('auth-error');
+        err.classList.remove('hidden');
+        document.getElementById('app-password').value = '';
+      }
+    }
+
+    // --- Dropdown Menus ---
+    function toggleExportMenu() {
+      document.getElementById('export-menu').classList.toggle('hidden');
+    }
+    
+    function toggleAddMenu() {
+      document.getElementById('add-menu').classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+      if(!e.target.closest('.export-dropdown-container')) {
+        const menu = document.getElementById('export-menu');
+        if(menu && !menu.classList.contains('hidden')) menu.classList.add('hidden');
+      }
+      if(!e.target.closest('.add-dropdown-container')) {
+        const addMenu = document.getElementById('add-menu');
+        if(addMenu && !addMenu.classList.contains('hidden')) addMenu.classList.add('hidden');
+      }
+    });
+
+    // --- Exports (CSV, PDF) ---
+    function exportToSheets() {
+      const items = getFilteredItems();
+      let csv = 'Category,Title,Location,Start Date,Start Time,End Date,End Time,Assigned To,Notes\n';
+      items.forEach(i => {
+        const row = [
+          i.category,
+          `"${(i.title || '').replace(/"/g, '""')}"`,
+          `"${(i.location || '').replace(/"/g, '""')}"`,
+          i.rawStartDate || '',
+          i.rawStartTime || '',
+          i.rawEndDate || '',
+          i.rawEndTime || '',
+          `"${(i.person || '').replace(/"/g, '""')}"`,
+          `"${(i.notes || '').replace(/"/g, '""')}"`
+        ];
+        csv += row.join(',') + '\n';
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'DEHGS_Trip_Itinerary.csv');
+      a.click();
+      document.getElementById('export-menu').classList.add('hidden');
+    }
+
+    function exportToPDF() {
+      const items = getFilteredItems();
+      const win = window.open('', '_blank');
+      if (!win) {
+        alert("Please allow popups to export your PDF report.");
+        return;
+      }
+
+      let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>DEHGS Trip Itinerary</title>
+          <style>
+            body { font-family: sans-serif; padding: 25px; color: #1e293b; }
+            h1 { font-size: 22px; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; }
+            p { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+            th { background-color: #f1f5f9; font-weight: bold; }
+            .badge { background: #e0e7ff; color: #3730a3; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+          </style>
+        </head>
+        <body>
+          <h1>Chandy and the Dehgs Trip</h1>
+          <p>Itinerary Report • Generated on ${new Date().toLocaleDateString()}</p>
+          <h3>Trip Dehgs (${window.state.dehgs.length}): ${window.state.dehgs.map(d => d.name).join(', ') || 'None'}</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date & Time</th>
+                <th>Category</th>
+                <th>Event & Location</th>
+                <th>Assigned To</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(i => `
+                <tr>
+                  <td style="white-space: nowrap;">${i.dateDisplay || i.date}</td>
+                  <td><span class="badge">${i.category}</span></td>
+                  <td><strong>${i.title}</strong>${i.location ? `<br><span style="color:#64748b; font-size:11px;">📍 ${i.location}</span>` : ''}</td>
+                  <td>${i.person}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+        </html>
+      `;
+
+      win.document.write(html);
+      win.document.close();
+      document.getElementById('export-menu').classList.add('hidden');
+    }
+
+    // --- Gemini AI Smart Parsing ---
+    async function processAIInput() {
+      const promptText = document.getElementById('ai-prompt-input').value.trim();
+      const fileInput = document.getElementById('ai-image-input');
+      const statusDiv = document.getElementById('ai-status-message');
+      const submitBtn = document.getElementById('ai-submit-btn');
+
+      if (!promptText && (!fileInput.files || fileInput.files.length === 0)) {
+        statusDiv.innerHTML = `<div class="p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl font-bold flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Please enter text notes or upload an image first.</div>`;
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Parsing with AI...`;
+      statusDiv.innerHTML = `<div class="p-3 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl font-medium flex items-center gap-2"><i class="fa-solid fa-spinner animate-spin"></i> Extracting itinerary items...</div>`;
+
+      try {
+        let base64Image = null;
+        let mimeType = "image/png";
+
+        if (fileInput.files && fileInput.files[0]) {
+          const file = fileInput.files[0];
+          mimeType = file.type;
+          base64Image = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+            reader.readAsDataURL(file);
+          });
+        }
+
+        const apiKey = "";
+        const systemPrompt = `You are a travel itinerary extraction assistant. Parse the user's free-form input or confirmation document image into a JSON array of events. 
+Each object in the array must have these exact keys:
+- title (string)
+- category (must be one of: "Flight", "Hotel", "Activity", "Ride", "Food")
+- location (string, venue or address)
+- rawStartDate (YYYY-MM-DD, assume year 2026 if not specified, default to "2026-10-01")
+- rawStartTime (HH:MM in 24-hour format, e.g., "19:00", default "12:00")
+- rawEndDate (YYYY-MM-DD)
+- rawEndTime (HH:MM)
+- person (string, name of person assigned or "Everyone")
+- notes (string)
+
+Return ONLY valid JSON array. No extra markdown text.`;
+
+        let contents = [];
+        let userMsg = promptText || "Extract all trip booking or event details from this image into itinerary items.";
+        
+        if (base64Image) {
+          contents = [{ role: "user", parts: [{ text: userMsg }, { inlineData: { mimeType, data: base64Image } }] }];
+        } else {
+          contents = [{ role: "user", parts: [{ text: userMsg }] }];
+        }
+
+        const payload = {
+          contents,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { responseMimeType: "application/json" }
+        };
+
+        const modelToUse = base64Image ? "gemini-2.5-flash-image-preview" : "gemini-2.5-flash-preview-09-2025";
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`API returned status ${response.status}`);
+        }
+
+        const result = await response.json();
+        let rawJsonText = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+        if (!rawJsonText) {
+          rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        }
+        
+        if (!rawJsonText) throw new Error("No response content generated by AI.");
+
+        const cleanJson = rawJsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsedEvents = JSON.parse(cleanJson);
+        
+        if (!Array.isArray(parsedEvents)) throw new Error("Parsed data was not an array.");
+
+        for (const ev of parsedEvents) {
+          await window.saveItem(ev);
+        }
+
+        statusDiv.innerHTML = `<div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-bold flex items-center gap-2"><i class="fa-solid fa-circle-check"></i> Successfully parsed & added ${parsedEvents.length} item(s) to your trip!</div>`;
+        document.getElementById('ai-prompt-input').value = '';
+        fileInput.value = '';
+        
+        setTimeout(() => {
+          closeModal('ai-import-modal');
+          statusDiv.innerHTML = '';
+        }, 2000);
+
+      } catch (err) {
+        console.error("AI Parsing Error:", err);
+        statusDiv.innerHTML = `<div class="p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl font-bold flex flex-col gap-1">
+          <span><i class="fa-solid fa-circle-exclamation"></i> AI Parsing Failed.</span>
+          <span class="text-xs font-normal text-rose-500">Details: ${err.message || 'Please check your input or image format and try again.'}</span>
+        </div>`;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-sparkles"></i> Extract & Add`;
+      }
+    }
+
+    // --- Search & Autocomplete ---
+    function handleLiveLocationSearch(query) {
+      const suggestionsBox = document.getElementById('location-suggestions');
+      const text = query.trim();
+      clearTimeout(searchDebounceTimer);
+
+      if (!text || text.length < 2) {
+        suggestionsBox.classList.add('hidden');
+        return;
+      }
+
+      suggestionsBox.innerHTML = `
+        <div class="p-3 text-xs text-slate-400 flex items-center gap-2">
+          <i class="fa-solid fa-circle-notch animate-spin text-indigo-500"></i>
+          <span>Searching global locations for "${text}"...</span>
+        </div>
+      `;
+      suggestionsBox.classList.remove('hidden');
+
+      searchDebounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&addressdetails=1&limit=6`);
+          const results = await res.json();
+
+          if (!results || results.length === 0) {
+            suggestionsBox.innerHTML = `
+              <div onclick="selectLocationSuggestion('${text.replace(/'/g, "\\'")}', null, null)" class="p-3 hover:bg-slate-50 cursor-pointer flex items-center gap-2.5 text-xs text-slate-700">
+                <i class="fa-solid fa-map-pin text-indigo-500"></i>
+                <div>
+                  <span class="font-bold">Use "${text}"</span>
+                  <span class="block text-[10px] text-slate-400">Custom Venue Location</span>
+                </div>
+              </div>
+            `;
+          } else {
+            let html = results.map(place => {
+              const displayName = place.display_name;
+              const mainName = place.name || displayName.split(',')[0];
+              const subAddress = displayName.split(',').slice(1, 4).join(',').trim();
+              const lat = parseFloat(place.lat);
+              const lon = parseFloat(place.lon);
+
+              return `
+                <div onclick="selectLocationSuggestion('${mainName.replace(/'/g, "\\'")}', ${lat}, ${lon})" class="p-3 hover:bg-indigo-50/60 cursor-pointer flex items-center gap-2.5 text-xs text-slate-700 border-b border-slate-100 last:border-b-0 transition-colors">
+                  <i class="fa-solid fa-location-dot text-indigo-500 shrink-0"></i>
+                  <div class="min-w-0 flex-1">
+                    <span class="font-bold block truncate text-slate-900">${mainName}</span>
+                    <span class="text-[10px] text-slate-400 truncate block">${subAddress || displayName}</span>
+                  </div>
+                </div>
+              `;
+            }).join('');
+
+            html += `
+              <div onclick="selectLocationSuggestion('${text.replace(/'/g, "\\'")}', null, null)" class="p-2.5 bg-slate-50 hover:bg-slate-100 cursor-pointer flex items-center gap-2 text-[11px] text-indigo-600 font-semibold border-t border-slate-100">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Use custom text "${text}"</span>
+              </div>
+            `;
+            suggestionsBox.innerHTML = html;
+          }
+        } catch (e) {
+          suggestionsBox.innerHTML = `
+            <div onclick="selectLocationSuggestion('${text.replace(/'/g, "\\'")}', null, null)" class="p-3 hover:bg-slate-50 cursor-pointer flex items-center gap-2.5 text-xs text-slate-700">
+              <i class="fa-solid fa-map-pin text-indigo-500"></i>
+              <div>
+                <span class="font-bold">Use "${text}"</span>
+                <span class="block text-[10px] text-slate-400">Custom Location</span>
+              </div>
+            </div>
+          `;
+        }
+      }, 350);
+    }
+
+    function selectLocationSuggestion(name, lat, lng) {
+      document.getElementById('item-location').value = name;
+      document.getElementById('item-lat').value = lat !== null ? lat : '';
+      document.getElementById('item-lng').value = lng !== null ? lng : '';
+      document.getElementById('location-suggestions').classList.add('hidden');
+    }
+
+    function clearLocationInput() {
+      document.getElementById('item-location').value = '';
+      document.getElementById('item-lat').value = '';
+      document.getElementById('item-lng').value = '';
+      document.getElementById('location-suggestions').classList.add('hidden');
+    }
+
+    function syncEndDateDefault() {
+      const startDateVal = document.getElementById('item-date').value;
+      if (startDateVal) document.getElementById('item-end-date').value = startDateVal;
+    }
+
+    function syncEndTimeDefault() {
+      const startTimeVal = document.getElementById('item-time').value;
+      if (startTimeVal) document.getElementById('item-end-time').value = startTimeVal;
+    }
+
+    function selectCategory(category) {
+      window.state.selectedCategory = category;
+      document.querySelectorAll('.cat-pill').forEach(pill => {
+        if (pill.getAttribute('data-cat') === category) {
+          pill.className = "cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-indigo-600 text-white border-indigo-600 shadow-sm";
+        } else {
+          pill.className = "cat-pill px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100";
+        }
+      });
+    }
+
+    function resetForm() {
+      document.getElementById('editing-item-id').value = '';
+      document.getElementById('modal-title-text').innerHTML = `<i class="fa-solid fa-calendar-plus text-indigo-600"></i> Add Itinerary Item`;
+      document.getElementById('item-title').value = '';
+      document.getElementById('item-location').value = '';
+      document.getElementById('item-lat').value = '';
+      document.getElementById('item-lng').value = '';
+      document.getElementById('item-date').value = '2026-10-01';
+      document.getElementById('item-time').value = '12:00';
+      document.getElementById('item-end-date').value = '2026-10-01';
+      document.getElementById('item-end-time').value = '12:00';
+      document.getElementById('location-suggestions').classList.add('hidden');
+      selectCategory('Flight');
+    }
+
+    function openModalForCreate() {
+      resetForm();
+      openModal('add-item-modal');
+    }
+
+    function openAIModal() {
+      document.getElementById('ai-prompt-input').value = '';
+      document.getElementById('ai-image-input').value = '';
+      document.getElementById('ai-status-message').innerHTML = '';
+      openModal('ai-import-modal');
+    }
+
+    function openModalForEdit(id) {
+      const item = window.state.items.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('editing-item-id').value = item.id;
+      document.getElementById('modal-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-indigo-600"></i> Edit Itinerary Item`;
+      document.getElementById('item-title').value = item.title || '';
+      document.getElementById('item-location').value = item.location || '';
+      document.getElementById('item-lat').value = item.lat || '';
+      document.getElementById('item-lng').value = item.lng || '';
+      document.getElementById('item-person').value = item.person || 'Everyone';
+      document.getElementById('item-date').value = item.rawStartDate || '2026-10-01';
+      document.getElementById('item-time').value = item.rawStartTime || '12:00';
+      document.getElementById('item-end-date').value = item.rawEndDate || item.rawStartDate || '2026-10-01';
+      document.getElementById('item-end-time').value = item.rawEndTime || item.rawStartTime || '12:00';
+      document.getElementById('item-notes').value = item.notes || '';
+      selectCategory(item.category || 'Flight');
+
+      openModal('add-item-modal');
+    }
+
+    function renderDehgs() {
+      const container = document.getElementById('dehgs-members-container');
+      const countEl = document.getElementById('dehgs-count');
+      const selectFilter = document.getElementById('filter-friend');
+      const selectModal = document.getElementById('item-person');
+
+      countEl.innerText = window.state.dehgs.length;
+
+      if (window.state.dehgs.length === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-500 italic">No dehgs added yet. Add friends above!</span>`;
+      } else {
+        container.innerHTML = window.state.dehgs.map(member => `
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-200 border border-slate-700/80 rounded-full text-xs font-medium shadow-sm">
+            <span>${member.name}</span>
+            <button onclick="window.removeDehgMember('${member.id}')" class="text-slate-400 hover:text-rose-400 text-xs ml-0.5 p-0.5"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        `).join('');
+      }
+
+      const currentFilter = selectFilter.value;
+      selectFilter.innerHTML = `<option value="ALL">All Dehgs</option>` + 
+        window.state.dehgs.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+      selectFilter.value = currentFilter;
+
+      const currentPerson = selectModal.value;
+      selectModal.innerHTML = `<option value="Everyone">Everyone</option>` + 
+        window.state.dehgs.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+      if (currentPerson) selectModal.value = currentPerson;
+    }
+
+    function switchView(viewName) {
+      window.state.currentView = viewName;
+      document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.classList.remove('bg-white', 'text-indigo-600', 'shadow-sm', 'font-bold');
+        btn.classList.add('text-slate-500');
+      });
+
+      const activeBtn = document.getElementById(`view-btn-${viewName}`);
+      activeBtn.classList.add('bg-white', 'text-indigo-600', 'shadow-sm', 'font-bold');
+      activeBtn.classList.remove('text-slate-500');
+
+      renderCurrentView();
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+      document.getElementById(id).classList.add('flex');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+      document.getElementById(id).classList.remove('flex');
+    }
+
+    function formatDisplayDate(rawDate) {
+      if (!rawDate) return '';
+      const parts = rawDate.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      return rawDate;
+    }
+
+    function formatDisplayTime(rawTime) {
+      if (!rawTime) return '';
+      const parts = rawTime.split(':');
+      if (parts.length >= 2) {
+        let hours = parseInt(parts[0], 10);
+        const minutes = parts[1];
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        return `${hours}:${minutes} ${ampm}`;
+      }
+      return rawTime;
+    }
+
+    function buildDateTimeDisplay(rawStartDate, rawStartTime, rawEndDate, rawEndTime) {
+      const startDateStr = formatDisplayDate(rawStartDate);
+      const startTimeStr = formatDisplayTime(rawStartTime);
+      const endDateStr = formatDisplayDate(rawEndDate);
+      const endTimeStr = formatDisplayTime(rawEndTime);
+
+      let startPart = `${startDateStr} ${startTimeStr}`.trim() || 'TBD';
+      if (!rawEndDate && !rawEndTime) return startPart;
+
+      if (rawStartDate && rawEndDate && rawStartDate === rawEndDate) {
+        if (endTimeStr && endTimeStr !== startTimeStr) return `${startPart} – ${endTimeStr}`;
+        return startPart;
+      }
+
+      let endPart = `${endDateStr} ${endTimeStr}`.trim();
+      if (endPart && endPart !== startPart) return `${startPart} – ${endPart}`;
+      return startPart;
+    }
+
+    // Chronological Sort
+    function getFilteredItems() {
+      const cat = document.getElementById('filter-category').value;
+      const friend = document.getElementById('filter-friend').value;
+
+      let filtered = window.state.items.filter(item => {
+        const matchesCat = (cat === 'ALL' || item.category === cat);
+        const matchesFriend = (friend === 'ALL' || item.person === 'Everyone' || item.person === friend);
+        return matchesCat && matchesFriend;
+      });
+
+      filtered.sort((a, b) => {
+        const dateA = new Date(`${a.rawStartDate || '9999-12-31'}T${a.rawStartTime || '00:00'}`);
+        const dateB = new Date(`${b.rawStartDate || '9999-12-31'}T${b.rawStartTime || '00:00'}`);
+        return dateA - dateB;
+      });
+
+      return filtered;
+    }
+
+    function renderEmptyState() {
+      return `
+        <div class="border-2 border-dashed border-slate-200 rounded-3xl p-8 sm:p-12 text-center flex flex-col items-center justify-center my-4">
+          <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-2xl mb-3 shadow-inner">
+            <i class="fa-regular fa-calendar-check"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Your itinerary is empty</h3>
+          <p class="text-xs text-slate-400 mt-1 max-w-sm leading-relaxed">
+            Start adding your flights, hotel stays, rental cars, or planned activities to share with the dehgs squad.
+          </p>
+          <button onclick="openModalForCreate()" class="mt-4 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-500 active:scale-95 transition-all">
+            + Add First Item
+          </button>
+        </div>
+      `;
+    }
+
+    function renderMapView(items) {
+      const container = document.getElementById('view-container');
+      const itemsWithLoc = items.filter(i => i.location && i.lat && i.lng);
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-map-pin text-indigo-600"></i> Trip Locations (${itemsWithLoc.length})
+            </h3>
+            <span class="text-xs text-slate-400">Click any marker to view details & get directions</span>
+          </div>
+          <div id="map-container" class="border border-slate-200 shadow-md"></div>
+        </div>
+      `;
+
+      setTimeout(() => {
+        if (leafletMap) {
+          leafletMap.remove();
+          leafletMap = null;
+        }
+
+        let initialLat = itemsWithLoc.length > 0 ? itemsWithLoc[0].lat : 21.3069;
+        let initialLng = itemsWithLoc.length > 0 ? itemsWithLoc[0].lng : -157.8583;
+
+        leafletMap = L.map('map-container').setView([initialLat, initialLng], 11);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(leafletMap);
+
+        const bounds = [];
+
+        itemsWithLoc.forEach(item => {
+          bounds.push([item.lat, item.lng]);
+          const marker = L.marker([item.lat, item.lng]).addTo(leafletMap);
+
+          const popupContent = `
+            <div class="p-1 max-w-xs text-slate-800">
+              <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 mb-1">${item.category}</span>
+              <h4 class="font-bold text-xs text-slate-900">${item.title}</h4>
+              <p class="text-[11px] font-medium text-indigo-600 mt-1 flex items-center gap-1">
+                <i class="fa-solid fa-location-dot"></i> ${item.location}
+              </p>
+              <p class="text-[11px] text-slate-500 mt-0.5"><i class="fa-regular fa-clock"></i> ${item.dateDisplay || item.date || 'TBD'}</p>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                <span class="font-bold text-slate-700">Dehg: ${item.person}</span>
+                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location)}" target="_blank" class="text-indigo-600 font-bold hover:underline">
+                  Directions →
+                </a>
+              </div>
+            </div>
+          `;
+          marker.bindPopup(popupContent);
+        });
+
+        if (bounds.length > 1) {
+          leafletMap.fitBounds(bounds, { padding: [35, 35] });
+        }
+        setTimeout(() => leafletMap.invalidateSize(), 200);
+      }, 100);
+    }
+
+    function renderCurrentView() {
+      const container = document.getElementById('view-container');
+      const items = getFilteredItems();
+
+      if (items.length === 0) {
+        container.innerHTML = renderEmptyState();
+        return;
+      }
+
+      if (window.state.currentView === 'map') {
+        renderMapView(items);
+        return;
+      }
+
+      if (window.state.currentView === 'table') {
+        container.innerHTML = `
+          <div class="overflow-x-auto border border-slate-200 rounded-2xl shadow-sm bg-white">
+            <table class="w-full text-left text-xs text-slate-600">
+              <thead class="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase font-bold text-[10px] tracking-wider">
+                <tr>
+                  <th class="p-3.5">Category</th>
+                  <th class="p-3.5">Item & Location</th>
+                  <th class="p-3.5">Schedule</th>
+                  <th class="p-3.5">Assigned To</th>
+                  <th class="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${items.map(item => `
+                  <tr class="hover:bg-slate-50/80 transition-colors">
+                    <td class="p-3.5">
+                      <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600">
+                        ${item.category}
+                      </span>
+                    </td>
+                    <td class="p-3.5 font-bold text-slate-800">
+                      <div>${item.title}</div>
+                      ${item.location ? `
+                        <div class="text-[11px] font-semibold text-indigo-600 mt-0.5 flex items-center gap-1">
+                          <i class="fa-solid fa-location-dot text-[10px]"></i>
+                          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location)}" target="_blank" class="hover:underline">
+                            ${item.location}
+                          </a>
+                        </div>
+                      ` : ''}
+                      ${item.notes ? `<div class="text-[11px] font-normal text-slate-400 mt-0.5">${item.notes}</div>` : ''}
+                    </td>
+                    <td class="p-3.5 font-medium text-slate-600">${item.dateDisplay || item.date || 'TBD'}</td>
+                    <td class="p-3.5 font-medium"><span class="px-2 py-0.5 bg-slate-100 rounded-full text-slate-700">${item.person}</span></td>
+                    <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                      <button onclick="openModalForEdit('${item.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" title="Edit Item">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                      </button>
+                      <button onclick="window.deleteItem('${item.id}')" class="text-slate-300 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition-colors" title="Delete Item">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (window.state.currentView === 'timeline') {
+        container.innerHTML = `
+          <div class="space-y-3">
+            ${items.map(item => `
+              <div class="p-4 border border-slate-200 rounded-2xl bg-white flex items-start justify-between shadow-sm">
+                <div class="flex items-start gap-3">
+                  <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold">
+                    <i class="fa-regular fa-clock"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] uppercase font-bold text-indigo-600">${item.category} • ${item.dateDisplay || item.date || 'TBD'}</span>
+                    <h4 class="font-bold text-slate-800 text-sm mt-0.5">${item.title}</h4>
+                    ${item.location ? `
+                      <p class="text-xs font-medium text-indigo-600 mt-0.5 flex items-center gap-1">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location)}" target="_blank" class="hover:underline">
+                          ${item.location}
+                        </a>
+                      </p>
+                    ` : ''}
+                    <p class="text-xs text-slate-500 mt-1">${item.notes || 'No extra notes'}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button onclick="openModalForEdit('${item.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                  </button>
+                  <button onclick="window.deleteItem('${item.id}')" class="text-slate-300 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition-colors">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (window.state.currentView === 'byperson') {
+        const persons = [...new Set(items.map(i => i.person))];
+        container.innerHTML = persons.map(p => {
+          const pItems = items.filter(i => i.person === p);
+          return `
+            <div class="mb-5 border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
+              <h4 class="font-bold text-sm text-slate-800 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-user text-indigo-500"></i> ${p}
+              </h4>
+              <div class="space-y-2">
+                ${pItems.map(i => `
+                  <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs">
+                    <div>
+                      <span class="font-bold text-slate-800">${i.title}</span>
+                      <span class="text-slate-400 text-[11px] ml-1">(${i.dateDisplay || i.date || 'TBD'})</span>
+                      ${i.location ? `<div class="text-indigo-600 text-[11px] mt-0.5"><i class="fa-solid fa-location-dot text-[9px]"></i> ${i.location}</div>` : ''}
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button onclick="openModalForEdit('${i.id}')" class="text-slate-400 hover:text-indigo-600 p-1">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                      </button>
+                      <button onclick="window.deleteItem('${i.id}')" class="text-slate-300 hover:text-rose-500 p-1">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    window.checkPassword = checkPassword;
+    window.toggleExportMenu = toggleExportMenu;
+    window.toggleAddMenu = toggleAddMenu;
+    window.exportToSheets = exportToSheets;
+    window.exportToPDF = exportToPDF;
+    window.renderDehgs = renderDehgs;
+    window.renderCurrentView = renderCurrentView;
+    window.switchView = switchView;
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.openModalForCreate = openModalForCreate;
+    window.openAIModal = openAIModal;
+    window.openModalForEdit = openModalForEdit;
+    window.resetForm = resetForm;
+    window.selectCategory = selectCategory;
+    window.handleLiveLocationSearch = handleLiveLocationSearch;
+    window.selectLocationSuggestion = selectLocationSuggestion;
+    window.clearLocationInput = clearLocationInput;
+    window.syncEndDateDefault = syncEndDateDefault;
+    window.syncEndTimeDefault = syncEndTimeDefault;
+    window.formatDisplayDate = formatDisplayDate;
+    window.formatDisplayTime = formatDisplayTime;
+    window.buildDateTimeDisplay = buildDateTimeDisplay;
+    window.getFilteredItems = getFilteredItems;
+    window.processAIInput = processAIInput;
+
+    // Check Auth on Init
+    window.onload = function() {
+      if (sessionStorage.getItem('dehgs_auth') === 'true') {
+        document.getElementById('auth-overlay').classList.add('hidden');
+        document.getElementById('app-wrapper').classList.remove('hidden');
+        if(window.initFirebase) window.initFirebase();
+      }
+    };
+  </script>
+</body>
+</html>
