@@ -78,7 +78,7 @@
       </div>
       <div>
         <h2 class="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Access Required</h2>
-        <p class="text-sm text-slate-400 mt-2">Enter the squad password to view the planner.</p>
+        <p class="text-sm text-slate-400 mt-2">Enter the password to view the planner.</p>
       </div>
       <div class="space-y-4">
         <input type="password" id="app-password" onkeydown="if(event.key==='Enter') window.checkPassword()" placeholder="Password" class="w-full bg-[#0b0f19] border border-slate-700/80 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-lg tracking-widest transition-all">
@@ -115,7 +115,6 @@
           </div>
           <div>
             <h1 class="text-xs sm:text-sm font-extrabold tracking-wider text-white uppercase">DEHGS PLANNER</h1>
-            <p class="text-[11px] sm:text-xs text-indigo-400 font-medium">Code: <span id="trip-code" class="font-bold">DEHGS</span></p>
           </div>
         </div>
 
@@ -161,8 +160,6 @@
         
         <div>
           <div class="flex items-center gap-1.5 text-xs font-bold tracking-wider text-indigo-400 uppercase mb-1">
-            <i class="fa-solid fa-cloud text-indigo-400"></i>
-            <span>Live Shared Itinerary</span>
             <span id="sync-status" class="ml-2 px-2.5 py-0.5 rounded-full text-[10px] bg-slate-500/20 text-slate-400 border border-slate-500/30 flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Connecting to Firestore...
             </span>
@@ -701,7 +698,7 @@
                 <th>Date & Time</th>
                 <th>Category</th>
                 <th>Event & Location</th>
-                <th>Assigned To</th>
+                <th>Dehgs</th>
               </tr>
             </thead>
             <tbody>
@@ -995,7 +992,7 @@ Return ONLY valid JSON array. No extra markdown text.`;
       countEl.innerText = window.state.dehgs.length;
 
       if (window.state.dehgs.length === 0) {
-        container.innerHTML = `<span class="text-xs text-slate-500 italic">No dehgs added yet. Add friends above!</span>`;
+        container.innerHTML = `<span class="text-xs text-slate-500 italic">No dehgs added yet.</span>`;
       } else {
         container.innerHTML = window.state.dehgs.map(member => `
           <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-200 border border-slate-700/80 rounded-full text-xs font-medium shadow-sm">
@@ -1216,7 +1213,7 @@ Return ONLY valid JSON array. No extra markdown text.`;
                   <th class="p-3.5">Category</th>
                   <th class="p-3.5">Item & Location</th>
                   <th class="p-3.5">Schedule</th>
-                  <th class="p-3.5">Assigned To</th>
+                  <th class="p-3.5">Dehgs</th>
                   <th class="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
