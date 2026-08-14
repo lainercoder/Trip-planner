@@ -1,5 +1,20 @@
 import { GoogleGenAI } from '@google/genai';
 
+const MODEL = 'gemini-3.5-flash';
+
+function getErrorMessage(error) {
+  if (error?.error?.message) return error.error.message;
+  if (typeof error?.message === 'string') {
+    try {
+      const parsed = JSON.parse(error.message);
+      return parsed?.error?.message || error.message;
+    } catch {
+      return error.message;
+    }
+  }
+  return 'Failed to generate AI response.';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -24,7 +39,7 @@ export default async function handler(req, res) {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL,
       contents: [{ role: 'user', parts }],
       config: {
         systemInstruction: systemPrompt,
@@ -35,6 +50,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ text: response.text });
   } catch (error) {
     console.error('Chat API error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to generate AI response.' });
+    return res.status(500).json({ error: getErrorMessage(error) });
   }
 }
