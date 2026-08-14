@@ -1,21 +1,23 @@
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize the client using the environment variable hidden on Vercel
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export default async function handler(req, res) {
-  // Only allow POST requests for security
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const { message, systemPrompt, image } = req.body;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+  }
 
-    if (!message && !image) {
+  try {
+    const { message, systemPrompt, image } = req.body || {};
+
+    if (!message && !image?.data) {
       return res.status(400).json({ error: 'Message or image is required' });
     }
 
+    const ai = new GoogleGenAI({ apiKey });
     const parts = [{ text: message || 'Extract all trip booking or event details from this image into itinerary items.' }];
     if (image?.data) {
       parts.push({ inlineData: { mimeType: image.mimeType || 'image/png', data: image.data } });
@@ -32,6 +34,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ text: response.text });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    console.error('Chat API error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to generate AI response.' });
   }
 }

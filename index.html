@@ -773,7 +773,13 @@ Return ONLY valid JSON array. No extra markdown text.`;
           })
         });
 
-        const result = await response.json();
+        const responseText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(responseText.trim().slice(0, 200) || `API returned status ${response.status}`);
+        }
 
         if (!response.ok) {
           throw new Error(result.error || `API returned status ${response.status}`);
