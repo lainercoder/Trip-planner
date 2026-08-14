@@ -10,12 +10,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message } = req.body;
+    const { message, systemPrompt, image } = req.body;
 
-    // Call the Gemini model securely from the server side
+    if (!message && !image) {
+      return res.status(400).json({ error: 'Message or image is required' });
+    }
+
+    const parts = [{ text: message || 'Extract all trip booking or event details from this image into itinerary items.' }];
+    if (image?.data) {
+      parts.push({ inlineData: { mimeType: image.mimeType || 'image/png', data: image.data } });
+    }
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: message,
+      contents: [{ role: 'user', parts }],
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
+      },
     });
 
     return res.status(200).json({ text: response.text });
