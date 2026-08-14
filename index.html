@@ -143,10 +143,10 @@
               <span>Add</span>
             </button>
             <div id="add-menu" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 hidden z-50 text-slate-700 overflow-hidden transform origin-top-right transition-all">
-              <button onclick="openModalForCreate(); toggleAddMenu()" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2.5 text-xs font-bold border-b border-slate-100">
+              <button onclick="openModalForCreate(); closeAddMenus()" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2.5 text-xs font-bold border-b border-slate-100">
                 <i class="fa-solid fa-pen text-slate-400 text-sm w-4"></i> Manual Entry
               </button>
-              <button onclick="openAIModal(); toggleAddMenu()" class="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-center gap-2.5 text-xs font-bold text-indigo-600">
+              <button onclick="openAIModal(); closeAddMenus()" class="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-center gap-2.5 text-xs font-bold text-indigo-600">
                 <i class="fa-solid fa-wand-magic-sparkles text-sm w-4"></i> AI Smart Import
               </button>
             </div>
@@ -616,8 +616,18 @@
       document.getElementById('export-menu').classList.toggle('hidden');
     }
     
-    function toggleAddMenu() {
-      document.getElementById('add-menu').classList.toggle('hidden');
+    function toggleAddMenu(menuId = 'add-menu') {
+      const menu = document.getElementById(menuId);
+      const isHidden = menu.classList.contains('hidden');
+      closeAddMenus();
+      if (isHidden) menu.classList.remove('hidden');
+    }
+
+    function closeAddMenus() {
+      ['add-menu', 'empty-add-menu'].forEach(id => {
+        const menu = document.getElementById(id);
+        if (menu) menu.classList.add('hidden');
+      });
     }
 
     document.addEventListener('click', function(e) {
@@ -1102,9 +1112,19 @@ Return ONLY valid JSON array. No extra markdown text.`;
           <p class="text-xs text-slate-400 mt-1 max-w-sm leading-relaxed">
             Start adding your flights, hotel stays, rental cars, or planned activities to share with the dehgs squad.
           </p>
-          <button onclick="openModalForCreate()" class="mt-4 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-500 active:scale-95 transition-all">
-            + Add First Item
-          </button>
+          <div class="relative add-dropdown-container mt-4">
+            <button onclick="toggleAddMenu('empty-add-menu')" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-500 active:scale-95 transition-all">
+              + Add First Item
+            </button>
+            <div id="empty-add-menu" class="absolute left-1/2 -translate-x-1/2 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 hidden z-50 text-slate-700 overflow-hidden">
+              <button onclick="openModalForCreate(); closeAddMenus()" class="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2.5 text-xs font-bold border-b border-slate-100">
+                <i class="fa-solid fa-pen text-slate-400 text-sm w-4"></i> Manual Entry
+              </button>
+              <button onclick="openAIModal(); closeAddMenus()" class="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-center gap-2.5 text-xs font-bold text-indigo-600">
+                <i class="fa-solid fa-wand-magic-sparkles text-sm w-4"></i> AI Smart Import
+              </button>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -1308,6 +1328,7 @@ Return ONLY valid JSON array. No extra markdown text.`;
     window.checkPassword = checkPassword;
     window.toggleExportMenu = toggleExportMenu;
     window.toggleAddMenu = toggleAddMenu;
+    window.closeAddMenus = closeAddMenus;
     window.exportToSheets = exportToSheets;
     window.exportToPDF = exportToPDF;
     window.renderDehgs = renderDehgs;
